@@ -7,13 +7,23 @@ import "./VRFv2DirectFundingConsumer.sol";
 contract Lottery is ConfirmedOwner, VRFv2DirectFundingConsumer {
     using SafeMath for uint256;
 
+    struct LotteryRound {
+        uint256 roundId;
+        uint256 timestamp;
+        uint256 potSize;
+        uint256 participantCount;
+        address winner;
+    }
+
     address payable[] public players;
     address[] public winners;
     uint256 public lotteryId;
     uint256 public potWidthdrawalEndTime;
 
+    mapping(uint256 => LotteryRound) public lotteryRounds;
+
     event PlayerEntered(address indexed player, uint256 amount);
-    event WinnerPicked(address indexed winner, uint256 amount);
+    event WinnerPicked(address indexed winner, uint256 amount, uint256 roundId);
     event LotteryReset(uint256 indexed lotteryId);
     event Received(address, uint);
 
@@ -68,10 +78,20 @@ contract Lottery is ConfirmedOwner, VRFv2DirectFundingConsumer {
         uint256 randomPlayerIndex = _randomNumber % players.length;
         address payable winner = players[randomPlayerIndex];
         uint256 pot = address(this).balance;
+
+        // Store lottery round details
+        lotteryRounds[lotteryId] = LotteryRound({
+            roundId: lotteryId,
+            timestamp: block.timestamp,
+            potSize: pot,
+            participantCount: players.length,
+            winner: winner
+        });
+
         winners.push(winner);
         lotteryId = lotteryId.add(1);
 
-        emit WinnerPicked(winner, pot);
+        emit WinnerPicked(winner, pot, lotteryId - 1);
         emit LotteryReset(lotteryId);
 
         players = new address payable[](0);
@@ -91,6 +111,10 @@ contract Lottery is ConfirmedOwner, VRFv2DirectFundingConsumer {
 
     function getWinners() public view returns (address[] memory) {
         return winners;
+    }
+
+    function getLotteryRoundDetails(uint256 _roundId) public view returns (LotteryRound memory) {
+        return lotteryRounds[_roundId];
     }
 
     receive() external payable {
