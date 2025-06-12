@@ -12,10 +12,24 @@ contract Lottery is ConfirmedOwner, VRFv2DirectFundingConsumer {
     uint256 public lotteryId;
     uint256 public potWidthdrawalEndTime;
 
+    // New struct to store comprehensive round details
+    struct LotteryRound {
+        uint256 roundId;
+        uint256 timestamp;
+        uint256 potSize;
+        uint256 numberOfParticipants;
+        address winner;
+        bool isCompleted;
+    }
+
+    // Mapping to store lottery round details
+    mapping(uint256 => LotteryRound) public lotteryRounds;
+
     event PlayerEntered(address indexed player, uint256 amount);
     event WinnerPicked(address indexed winner, uint256 amount);
     event LotteryReset(uint256 indexed lotteryId);
     event Received(address, uint);
+    event RoundDetailsUpdated(uint256 indexed roundId, address winner, uint256 potSize);
 
     constructor() VRFv2DirectFundingConsumer() {
         lotteryId = 1;
@@ -68,14 +82,30 @@ contract Lottery is ConfirmedOwner, VRFv2DirectFundingConsumer {
         uint256 randomPlayerIndex = _randomNumber % players.length;
         address payable winner = players[randomPlayerIndex];
         uint256 pot = address(this).balance;
-        winners.push(winner);
-        lotteryId = lotteryId.add(1);
 
+        // Store comprehensive round details
+        lotteryRounds[lotteryId] = LotteryRound({
+            roundId: lotteryId,
+            timestamp: block.timestamp,
+            potSize: pot,
+            numberOfParticipants: players.length,
+            winner: winner,
+            isCompleted: true
+        });
+
+        winners.push(winner);
         emit WinnerPicked(winner, pot);
+        emit RoundDetailsUpdated(lotteryId, winner, pot);
+
+        lotteryId = lotteryId.add(1);
         emit LotteryReset(lotteryId);
 
         players = new address payable[](0);
         potWidthdrawalEndTime = block.timestamp + 10 minutes;
+    }
+
+    function getLotteryRoundDetails(uint256 _roundId) public view returns (LotteryRound memory) {
+        return lotteryRounds[_roundId];
     }
 
     function withdrawPot() public payable {
